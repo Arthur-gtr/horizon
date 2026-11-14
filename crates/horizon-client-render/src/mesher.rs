@@ -28,6 +28,9 @@ use horizon_world::{
     fluid::{FluidKind, FluidState},
     registry::BlockStateId,
 };
+
+use std::time::Instant;
+
 #[cfg(test)]
 pub(crate) use sides::sort_tinted;
 pub use sides::{Part, Sides, group_parts};
@@ -1879,6 +1882,7 @@ impl Mesher<'_> {
         mut out: SectionMesh,
         scratch: &mut MeshScratch,
     ) -> SectionMesh {
+        let start = Instant::now(); // Benchmark chrono
         out.clear();
         let center = region[1][1].expect("centre chunk");
         let section = &center.sections[sy as usize];
@@ -2075,6 +2079,13 @@ impl Mesher<'_> {
             }
         }
         out.finish_sprite_layers();
+
+        let duration = start.elapsed();
+
+        if duration.as_millis() > 1 {
+            println!("Section Y={} meshed by the cpu : {:?}", sy, duration);
+        }
+
         out
     }
     /// `BlockColors` tint source `index`, or `None` for an untinted (-1) layer.
