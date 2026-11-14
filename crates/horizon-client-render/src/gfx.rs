@@ -2549,6 +2549,7 @@ impl Renderer {
         display: output::DisplayReading,
     ) -> Result<Self> {
         #[cfg(feature = "vulkan-native")]
+        if previous.is_none() {
         {
             unsafe {
                 let entry = Entry::load().expect("Vulkan not find");
@@ -2559,11 +2560,70 @@ impl Renderer {
                 let create_info = vk::InstanceCreateInfo::builder()
                     .application_info(&app_info);
 
-                let _instance = entry.create_instance(&create_info, None)
+                let instance = entry.create_instance(&create_info, None)
                     .expect("Error while creating the Vulkan instance");
 
                 println!("Vulkan Instance native initialised");
+
+                let physical_devices = instance.enumerate_physical_devices()
+                    .expect("Failed to enumerate physical devices");
+
+                for &p_device in physical_devices.iter() {
+                    let properties = instance.get_physical_device_properties(p_device);
+
+                    if properties.device_type == vk::PhysicalDeviceType::DISCRETE_GPU {
+                        let device_name = std::ffi::CStr::from_ptr(properties.device_name.as_ptr()).to_string_lossy();
+                        println!("{} (Discrete GPU) locked", device_name);
+
+                        let queue_families = instance.get_physical_device_queue_family_properties(p_device);
+                        let compute_queue_index = queue_families
+                            .iter()
+                            .position(|q| q.queue_flags.contains(vk::QueueFlags::COMPUTE)) // init -> with compute flag
+                            .expect("No compute queue found");
+
+                        let queue_priorities = [1.0];
+                        let queue_info = vk::DeviceQueueCreateInfo::builder()
+                            .queue_family_index(compute_queue_index as u32)
+                            .queue_priorities(&queue_priorities);
+
+                        let device_info = vk::DeviceCreateInfo::builder()
+                            .queue_create_infos(std::slice::from_ref(&queue_info));
+
+                        let logical_device = instance.create_device(p_device, &device_info, None)
+                            .expect("Failed to create logical device");
+                        println!("Logical Device operational");
+
+                        let pool_info = vk::CommandPoolCreateInfo::builder()
+                            .queue_family_index(compute_queue_index as u32)
+                            .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
+
+                        let command_pool = logical_device.create_command_pool(&pool_info, None)
+                            .expect("Failed to create command pool");
+
+                        let alloc_info = vk::CommandBufferAllocateInfo::builder()
+                            .command_pool(command_pool)
+                            .level(vk::CommandBufferLevel::PRIMARY)
+                            .command_buffer_count(1);
+
+                        let _command_buffers = logical_device.allocate_command_buffers(&alloc_info)
+                            .expect("Failed to allocate command buffer");
+                        println!("Command Buffer ready");
+
+                        let buffer_info = vk::BufferCreateInfo::builder()
+                            .size(50_000_000)
+                            .usage(vk::BufferUsageFlags::STORAGE_BUFFER) // store as ssbo
+                            .sharing_mode(vk::SharingMode::EXCLUSIVE);
+
+                        let _test_buffer = logical_device.create_buffer(&buffer_info, None)
+                            .expect("Failed to allocate VRAM");
+
+                        println!("Success: VRAM allocated");
+
+                        break;
+                    }
+                }
             }
+        }
         }
         let Opened {
             instance,
