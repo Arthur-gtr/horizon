@@ -141,6 +141,8 @@ alloc-census = ["horizon-threads/alloc-census"]
 windows-mimalloc = []
 # Opt-in Windows heap experiment; see docs/windows-allocators.md.
 windows-segment-heap = []
+#link vulkan
+vulkan-native = ["horizon-client-render/vulkan-native"]
 
 [[bin]]
 name = "horizon-client"
