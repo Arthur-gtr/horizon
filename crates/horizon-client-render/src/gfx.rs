@@ -17,6 +17,9 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Instant};
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
+#[cfg(feature = "vulkan-native")]
+use ash::{vk, Entry};
+
 // RenderPipelines.CRUMBLING: dst * src + src * dst, alpha replaced.
 const CRUMBLING_BLEND: wgpu::BlendState = wgpu::BlendState {
     color: wgpu::BlendComponent {
@@ -2545,6 +2548,23 @@ impl Renderer {
         request: output::FrameRequest,
         display: output::DisplayReading,
     ) -> Result<Self> {
+        #[cfg(feature = "vulkan-native")]
+        {
+            unsafe {
+                let entry = Entry::load().expect("Vulkan not find");
+                let app_info = vk::ApplicationInfo::builder()
+                    .application_name(c"Horizon Vulkan Exp")
+                    .api_version(vk::make_api_version(0, 1, 3, 0));
+
+                let create_info = vk::InstanceCreateInfo::builder()
+                    .application_info(&app_info);
+
+                let _instance = entry.create_instance(&create_info, None)
+                    .expect("Error while creating the Vulkan instance");
+
+                println!("Vulkan Instance native initialised");
+            }
+        }
         let Opened {
             instance,
             surface,
